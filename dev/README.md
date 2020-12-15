@@ -346,4 +346,21 @@ To create a separate solr vm create a `config.yml` file with the following conte
   external_solr:
     start: true
 ```
+# Buildkite
+
+Buildkite is used to create continuous integration pipelines.
+Pipeline contains many checks to make sure the build is working properly.
+A Build can be triggered for the pull request submitted to the repository or initiate the build manually.
+
+The main pipeline for this repository are:
+* `[chef/chef-server:master] verify`
+* `[chef/chef-server:master] omnibus/adhoc`
+
+For this repository, `[chef/chef-server:master] verify` pipeline build is started automatically when submitting the pull request.
+The result of suck build will be linked to the pull request.
+If required the build can also be started manually for the different branch.
+
+The build can fail and block the pull request if any of the checks fail in the pipeline.
+Checking the logs of the build will help in understanding the error.
+
 
