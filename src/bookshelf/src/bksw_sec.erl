@@ -146,8 +146,10 @@ auth_finish(Auth, #context{
                      x_amz_expires_int = XAmzExpiresInt,
                      x_amz_expires_str = XAmzExpiresString
                   } = Context, ComparisonURL, IncomingSig, CalculatedSig) ->
-    case IncomingSig of
-        CalculatedSig ->
+    % TODO: if this works, perhaps remove auth_finish and refactor above somewhere.
+    % also, remove relevant code in bksw_wm_base.erl
+    case {IncomingSig, AuthType} of
+        {CalculatedSig, presigned_url} ->
             case is_expired(Date, XAmzExpiresInt) of
                 true ->
                     ?LOG_DEBUG("req_id=~p expired signature (~p) for ~p", [ReqId, XAmzExpiresInt, path(Auth)]),
@@ -164,14 +166,13 @@ auth_finish(Auth, #context{
                                                        ComparisonURL, req(Auth), Context)
                     end
             end;
-        _ ->
-            case AuthType of
-                presigned_url ->
-                    encode_access_denied_error_response(reqid(Auth), req(Auth), Context);
-                auth_header ->
-                    encode_sign_error_response(AWSAccessKeyId, IncomingSig, reqid(Auth),
-                                               ComparisonURL, req(Auth), Context)
-            end
+        {_, presigned_url} ->
+            encode_access_denied_error_response(reqid(Auth), req(Auth), Context);
+        {CalculatedSig, auth_header} ->
+            {true, req(Auth), Context};
+        {_, auth_header} ->
+            encode_sign_error_response(AWSAccessKeyId, IncomingSig, reqid(Auth),
+                                       ComparisonURL, req(Auth), Context)
     end.
 
 encode_sign_error_response(AccessKeyId, Signature,
