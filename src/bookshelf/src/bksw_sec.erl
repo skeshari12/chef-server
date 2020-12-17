@@ -40,12 +40,12 @@
 
 is_authorized(Req0, #context{auth_check_disabled = true          } = Context) -> {true, Req0, Context};
 is_authorized(Req0, #context{auth_type           = presigned_url,
-                     aws_access_key_id = AWSAccessKeyId,
+                             aws_access_key_id   = AWSAccessKeyId,
                              date                = Date,
                              incoming_sig        = IncomingSignature,
                              reqid               = ReqId,
                              signed_headers      = SignedHeaders,
-                     x_amz_expires_str = XAmzExpiresString,
+                             x_amz_expires_str   = XAmzExpiresString,
                              x_amz_expires_int   = XAmzExpiresInt} = Context) ->
     Auth               = auth_init(Req0, Context, SignedHeaders),
     {Bucketname, Key } = get_bucket_key(path(Auth)),
@@ -96,7 +96,7 @@ is_authorized(Req0, #context{auth_type           = presigned_url,
             encode_access_denied_error_response(reqid(Auth), req(Auth), Context)
     end;
 is_authorized(Req0, #context{auth_type           = auth_header,
-                     aws_access_key_id = AWSAccessKeyId,
+                             aws_access_key_id   = AWSAccessKeyId,
                              date                = Date,
                              incoming_sig        = IncomingSignature,
                              region              = Region,
