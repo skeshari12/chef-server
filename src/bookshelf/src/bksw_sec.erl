@@ -29,6 +29,8 @@
 -compile([export_all, nowarn_export_all       ]).
 -endif.
 
+-include_lib("eunit/include/eunit.hrl").
+
 % is this necessary?  try removing.
 -include("internal.hrl").
 
@@ -62,6 +64,9 @@ is_authorized(Req0, #context{auth_type           = presigned_url,
     % whether this capability is still necessary would require some investigation
     % and testing.
 
+?debugFmt("~n~nIncomingSig:   ~p  is_list: ~p  is_binary: ~p", [IncomingSig, is_list(IncomingSig), is_binary(IncomingSig)]),
+?debugFmt(  "~nComparisonSig: ~p", [ComparisonSig]),
+
     CalculatedSig =
         case IncomingSig of
             ComparisonSig ->
@@ -69,6 +74,7 @@ is_authorized(Req0, #context{auth_type           = presigned_url,
             _ ->
                 AltComparisonURL      = mini_s3:s3_url(method(Auth), Bucketname, Key, XAmzExpiresInt, alt_signed_headers(Auth), Date, config(Auth)),
                 [_, AltComparisonSig] = string:split(AltComparisonURL, "&X-Amz-Signature=", all),
+?debugFmt(  "~nAltComparisonSig: ~p", [AltComparisonSig]),
                 AltComparisonSig
         end,
 
@@ -114,6 +120,8 @@ is_authorized(Req0, #context{auth_type           = auth_header,
     % whether this capability is still necessary would require some investigation
     % and testing.
 
+?debugFmt("~n~nIncomingSig:   ~p  is_list: ~p  is_binary: ~p", [IncomingSig, is_list(IncomingSig), is_binary(IncomingSig)]),
+?debugFmt(  "~nComparisonSig: ~p", [ComparisonSig]),
     CalculatedSig =
         case IncomingSig of
             ComparisonSig ->
@@ -121,6 +129,8 @@ is_authorized(Req0, #context{auth_type           = auth_header,
             _ ->
                 AltSigV4Headers   = erlcloud_aws:sign_v4(method(Auth), path(Auth), config(Auth), alt_signed_headers(Auth), <<>>, Region, "s3", QueryParams, Date),
                 _AltComparisonSig = parseauth(proplists:get_value("Authorization", AltSigV4Headers, ""))
+,?debugFmt(  "~n_AltComparisonSig: ~p", [_AltComparisonSig]),
+_AltComparisonSig
         end,
 
     case IncomingSig of
