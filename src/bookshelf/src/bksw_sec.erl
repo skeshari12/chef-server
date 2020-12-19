@@ -42,16 +42,15 @@ is_authorized(Req0, #context{auth_check_disabled = true          } = Context) ->
 is_authorized(Req0, #context{auth_type           = presigned_url,
                              aws_access_key_id   = AWSAccessKeyId,
                              date                = Date,
-                             incoming_sig        = IncomingSignature0,
+                             incoming_sig        = IncomingSignature,
                              reqid               = ReqId,
                              signed_headers      = SignedHeaders,
                              x_amz_expires_str   = XAmzExpiresString,
                              x_amz_expires_int   = XAmzExpiresInt} = Context) ->
-    IncomingSignature  = bksw_util:to_string(IncomingSignature0),
     Auth               = auth_init(Req0, Context, SignedHeaders),
     {Bucketname, Key } = get_bucket_key(path(Auth)),
     ComparisonURL      = mini_s3:s3_url(method(Auth), Bucketname, Key, XAmzExpiresInt, SignedHeaders, Date, config(Auth)),
-%   IncomingSig        = list_to_binary(IncomingSignature),
+    IncomingSig        = list_to_binary(IncomingSignature),
     [_, ComparisonSig] = string:split(ComparisonURL, "&X-Amz-Signature=", all),
 
     % If the signature computation and comparison fails, this
@@ -64,22 +63,17 @@ is_authorized(Req0, #context{auth_type           = presigned_url,
     % and testing.
 
     CalculatedSig =
-%       case IncomingSig of
-%           ComparisonSig ->
-%               IncomingSig;
-        case ct_compare(IncomingSignature, ComparisonSig, true) of
-            true ->
-                IncomingSignature;
+        case IncomingSig of
+            ComparisonSig ->
+                IncomingSig;
             _ ->
                 AltComparisonURL      = mini_s3:s3_url(method(Auth), Bucketname, Key, XAmzExpiresInt, alt_signed_headers(Auth), Date, config(Auth)),
                 [_, AltComparisonSig] = string:split(AltComparisonURL, "&X-Amz-Signature=", all),
                 AltComparisonSig
         end,
 
-%    case IncomingSig of
-%        CalculatedSig ->
-    case ct_compare(IncomingSignature, CalculatedSig, true) of
-        true ->
+    case IncomingSig of
+        CalculatedSig ->
             case is_expired(Date, XAmzExpiresInt) of
                 true ->
                     ?LOG_DEBUG("req_id=~p expired signature (~p) for ~p", [ReqId, XAmzExpiresInt, path(Auth)]),
@@ -92,7 +86,7 @@ is_authorized(Req0, #context{auth_type           = presigned_url,
                             {true, Req2, Context};
                         false ->
                             ?LOG_DEBUG("req_id=~p signing error for ~p", [ReqId, path(Auth)]),
-                            encode_sign_error_response(AWSAccessKeyId, IncomingSignature, reqid(Auth),
+                            encode_sign_error_response(AWSAccessKeyId, IncomingSig, reqid(Auth),
                                                        CalculatedSig, req(Auth), Context)
                     end
             end;
@@ -102,14 +96,13 @@ is_authorized(Req0, #context{auth_type           = presigned_url,
 is_authorized(Req0, #context{auth_type           = auth_header,
                              aws_access_key_id   = AWSAccessKeyId,
                              date                = Date,
-                             incoming_sig        = IncomingSignature0,
+                             incoming_sig        = IncomingSignature,
                              region              = Region,
                              signed_headers      = SignedHeaders} = Context) ->
-    IncomingSignature  = bksw_util:to_string(IncomingSignature0),
     Auth          = auth_init(Req0, Context, SignedHeaders),
     QueryParams   = wrq:req_qs(req(Auth)),
     SigV4Headers  = erlcloud_aws:sign_v4(method(Auth), path(Auth), config(Auth), SignedHeaders, <<>>, Region, "s3", QueryParams, Date),
-%   IncomingSig   = IncomingSignature,
+    IncomingSig   = IncomingSignature,
     ComparisonSig = parseauth(proplists:get_value("Authorization", SigV4Headers, "")),
 
     % If the signature computation and comparison fails, this
@@ -122,24 +115,19 @@ is_authorized(Req0, #context{auth_type           = auth_header,
     % and testing.
 
     CalculatedSig =
-%       case IncomingSig of
-%           ComparisonSig ->
-%               IncomingSig;
-    case ct_compare(IncomingSignature, ComparisonSig, true) of
-        true ->
-            IncomingSignature;
+        case IncomingSig of
+            ComparisonSig ->
+                IncomingSig;
             _ ->
                 AltSigV4Headers   = erlcloud_aws:sign_v4(method(Auth), path(Auth), config(Auth), alt_signed_headers(Auth), <<>>, Region, "s3", QueryParams, Date),
                 _AltComparisonSig = parseauth(proplists:get_value("Authorization", AltSigV4Headers, ""))
         end,
 
-%   case IncomingSig of
-%       CalculatedSig ->
-    case ct_compare(IncomingSignature, CalculatedSig, true) of
-        true ->
+    case IncomingSig of
+        CalculatedSig ->
             {true, req(Auth), Context};
         _ ->
-            encode_sign_error_response(AWSAccessKeyId, IncomingSignature, reqid(Auth),
+            encode_sign_error_response(AWSAccessKeyId, IncomingSig, reqid(Auth),
                                        CalculatedSig, req(Auth), Context)
     end.
 
@@ -161,16 +149,6 @@ auth_init(Req0, Context, SignedHeaders) ->
       req                => Req1,
       reqid              => RequestId}.
 
-% due to a security vulnerability described by Mark Anderson, we should compare signatures
-% in constant time, and not 'early out' on the first mismatched character.  this means we
-% are purposefully using a 'deoptimized' string compare function.
--spec ct_compare(string(), string(), boolean()) -> boolean().
-ct_compare([    ], [    ], IsEqual) -> IsEqual;
-ct_compare([    ], [_|S2],       _) -> ct_compare([], S2, false  );
-ct_compare([_|S1], [    ],       _) -> ct_compare(S1, [], false  );
-ct_compare([X|S1], [X|S2], IsEqual) -> ct_compare(S1, S2, IsEqual);
-ct_compare([_|S1], [_|S2],       _) -> ct_compare(S1, S2, false  ).
-
 encode_access_denied_error_response(RequestId, Req0, Context) ->
     Req1 = bksw_req:with_amz_id_2(Req0),
     Body = bksw_xml:access_denied_error(RequestId),
@@ -179,7 +157,7 @@ encode_access_denied_error_response(RequestId, Req0, Context) ->
 
 encode_sign_error_response(AccessKeyId, Signature,
                            RequestId, StringToSign, Req0,
-                           Context) ->
+                          Context) ->
     Req1 = bksw_req:with_amz_id_2(Req0),
     Body = bksw_xml:signature_does_not_match_error(
              RequestId, bksw_util:to_string(Signature),
