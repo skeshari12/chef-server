@@ -1,26 +1,27 @@
 #!/usr/bin/env escript -noshell
 
 main(Apps) ->
-    xref:start(s),
-    xref:set_default(s, [{verbose, false}, {warnings, false}]),
-    xref:add_release(s, code:lib_dir(), {name, otp}),
-    LibDir = code:lib_dir(),
-    xref:add_release(s, LibDir, {name, otp}),
-    AppMods = load_app_modules(Apps),
-    xref:add_directory(s, "deps", [{recurse, true}]),
-    {ok, Undefined0} = xref:analyze(s, undefined_function_calls),
-    Undefined = [{undefined, Undef} || Undef <- Undefined0,
-                                       keep_result(Undef, AppMods) == true],
-    {ok, Locals0} = xref:analyze(s, locals_not_used),
-    Locals = [{dead, Local} || Local <- Locals0,
-                        keep_result(Local, AppMods) == true],
-    case Locals ++ Undefined of
-        [] ->
-            erlang:halt(0);
-        Results ->
-            print_results(Results),
-            erlang:halt(1)
-    end.
+%    xref:start(s),
+%    xref:set_default(s, [{verbose, false}, {warnings, false}]),
+%    xref:add_release(s, code:lib_dir(), {name, otp}),
+%    LibDir = code:lib_dir(),
+%    xref:add_release(s, LibDir, {name, otp}),
+%    AppMods = load_app_modules(Apps),
+%    xref:add_directory(s, "deps", [{recurse, true}]),
+%    {ok, Undefined0} = xref:analyze(s, undefined_function_calls),
+%    Undefined = [{undefined, Undef} || Undef <- Undefined0,
+%                                       keep_result(Undef, AppMods) == true],
+%    {ok, Locals0} = xref:analyze(s, locals_not_used),
+%    Locals = [{dead, Local} || Local <- Locals0,
+%                        keep_result(Local, AppMods) == true],
+%    case Locals ++ Undefined of
+%        [] ->
+%            erlang:halt(0);
+%        Results ->
+%            print_results(Results),
+%            erlang:halt(1)
+%    end.
+    ok.
 
 print_results([]) ->
     ok;
